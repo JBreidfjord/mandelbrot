@@ -1,4 +1,6 @@
+use image::{GrayImage, ImageBuffer, Luma};
 use num::complex::Complex;
+use std::convert::TryInto;
 
 fn calculate_mandelbrot(
     max_iters: usize,
@@ -41,28 +43,32 @@ fn mandelbrot_at_point(cx: f64, cy: f64, max_iters: usize) -> usize {
     max_iters
 }
 
-fn render_mandelbrot(escape_vals: Vec<Vec<usize>>) {
+fn render_mandelbrot(escape_vals: Vec<Vec<usize>>, max_iters: usize, width: u32, height: u32) {
+    let mut img: GrayImage = ImageBuffer::new(width, height);
+    let mut y = 0;
     for row in escape_vals {
-        let mut line = String::with_capacity(row.len());
+        let mut x = 0;
         for column in row {
-            let val = match column {
-                0..=2 => ' ',
-                3..=5 => '.',
-                6..=10 => '•',
-                11..=30 => '*',
-                31..=100 => '+',
-                101..=200 => 'x',
-                201..=400 => '$',
-                401..=700 => '#',
-                _ => '%',
-            };
-            line.push(val);
+            let val: u8 = (column * 255 / max_iters).try_into().unwrap();
+            img.put_pixel(x, y, Luma([val]));
+            x += 1;
         }
-        println!("{}", line);
+        y += 1;
     }
+    img.save(format!("mb_{}_{}x{}.png", max_iters, width, height))
+        .unwrap();
 }
 
 fn main() {
-    let mandelbrot = calculate_mandelbrot(1000, -2.0, 1.0, -1.0, 1.0, 350, 75);
-    render_mandelbrot(mandelbrot);
+    let max_iters = 100;
+    let width = 1920;
+    let height = 1080;
+
+    let mandelbrot = calculate_mandelbrot(max_iters, -2.0, 1.0, -1.0, 1.0, width, height);
+    render_mandelbrot(
+        mandelbrot,
+        max_iters,
+        width.try_into().unwrap(),
+        height.try_into().unwrap(),
+    );
 }
