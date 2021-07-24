@@ -1,7 +1,6 @@
 use image::{GrayImage, ImageBuffer, Luma};
 use num::complex::Complex;
 use rayon::prelude::*;
-use std::convert::TryInto;
 
 fn calculate_mandelbrot(
     max_iters: usize,
@@ -40,30 +39,54 @@ fn mandelbrot_at_point(cx: f64, cy: f64, max_iters: usize) -> usize {
     max_iters
 }
 
-fn render_mandelbrot(pixels: Vec<usize>, max_iters: usize, width: u32, height: u32) {
-    let mut img: GrayImage = ImageBuffer::new(width, height);
+fn render_mandelbrot(pixels: Vec<usize>, iters: usize, width: usize, height: usize, frame: u32) {
+    let mut img: GrayImage = ImageBuffer::new(width as u32, height as u32);
     let mut i = 0;
     for pixel in pixels {
         let y = i / width;
         let x = i - (y * width);
-        let val: u8 = (pixel * 255 / max_iters).try_into().unwrap();
-        img.put_pixel(x, y, Luma([val]));
+        let val = pixel * 255 / iters;
+        img.put_pixel(x as u32, y as u32, Luma([val as u8]));
         i += 1;
     }
-    img.save(format!("mb_{}_{}x{}.png", max_iters, width, height))
+    std::fs::create_dir_all(format!("images/{}x{}/", width, height)).unwrap();
+    img.save(format!("images/{}x{}/{}.png", width, height, frame))
         .unwrap();
 }
 
 fn main() {
-    let max_iters = 100;
     let width = 1920;
-    let height = 1080;
+    let max_frames = 480;
+    let zoom_x = -1.0067581019642513;
+    let zoom_y = 0.3112899872556565;
+    let rad_mult = 1.03; // Controls speed of zoom based on framerate
 
-    let mandelbrot = calculate_mandelbrot(max_iters, -2.0, 1.0, -1.0, 1.0, width, height);
-    render_mandelbrot(
-        mandelbrot,
-        max_iters,
-        width.try_into().unwrap(),
-        height.try_into().unwrap(),
-    );
+    let mut rad_x = 2.0;
+    let mut rad_y = 1.0;
+
+    let height = width / 16 * 9;
+
+    for frame in 0..=max_frames {
+        let x_min = zoom_x - rad_x;
+        let x_max = zoom_x + rad_x;
+        let y_min = zoom_y - rad_y;
+        let y_max = zoom_y + rad_y;
+        let power = (2f64 / rad_x).log(2.0);
+
+        let scale = width as f64 / (y_max - y_min);
+        let max_iters = ((2.0 * (1.0 - (5.0 * scale).sqrt()).abs().sqrt()).sqrt() * 66.5) as usize;
+        println!(
+            "Frame {} | Power {} | Iters {} | x scale {} | y scale {}",
+            frame,
+            power,
+            max_iters,
+            x_max - x_min,
+            y_max - y_min
+        );
+        let mandelbrot = calculate_mandelbrot(max_iters, x_min, x_max, y_min, y_max, width, height);
+        render_mandelbrot(mandelbrot, max_iters, width, height, frame);
+
+        rad_x /= rad_mult;
+        rad_y /= rad_mult;
+    }
 }
