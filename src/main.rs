@@ -1,4 +1,5 @@
-use image::{GrayImage, ImageBuffer, Luma};
+use colorgrad;
+use image::{ImageBuffer, Rgba, RgbaImage};
 use num::complex::Complex;
 use rayon::prelude::*;
 
@@ -19,16 +20,16 @@ fn calculate_mandelbrot(
             let x_percent = img_x as f64 / width as f64;
             let cx = x_min + (x_max - x_min) * x_percent;
             let cy = y_min + (y_max - y_min) * y_percent;
-            let escaped_at = mandelbrot_at_point(cx, cy, max_iters);
+            let c = Complex::new(cx, cy);
+            let escaped_at = mandelbrot_at_point(c, max_iters);
             row[img_x] = escaped_at;
         }
     });
     pixels
 }
 
-fn mandelbrot_at_point(cx: f64, cy: f64, max_iters: usize) -> usize {
+fn mandelbrot_at_point(c: Complex<f64>, max_iters: usize) -> usize {
     let mut z = Complex { re: 0.0, im: 0.0 };
-    let c = Complex::new(cx, cy);
 
     for i in 0..=max_iters {
         if z.norm() > 2.0 {
@@ -40,13 +41,15 @@ fn mandelbrot_at_point(cx: f64, cy: f64, max_iters: usize) -> usize {
 }
 
 fn render_mandelbrot(pixels: Vec<usize>, iters: usize, width: usize, height: usize, frame: u32) {
-    let mut img: GrayImage = ImageBuffer::new(width as u32, height as u32);
+    let mut img: RgbaImage = ImageBuffer::new(width as u32, height as u32);
+    let grad = colorgrad::viridis(); // Change colors by switching gradient
     let mut i = 0;
     for pixel in pixels {
         let y = i / width;
         let x = i - (y * width);
-        let val = pixel * 255 / iters;
-        img.put_pixel(x as u32, y as u32, Luma([val as u8]));
+        let rgba_comp = grad.at(pixel as f64 / iters as f64).rgba_u8();
+        let rgba = [rgba_comp.0, rgba_comp.1, rgba_comp.2, rgba_comp.3];
+        img.put_pixel(x as u32, y as u32, Rgba(rgba));
         i += 1;
     }
     std::fs::create_dir_all(format!("images/{}x{}/", width, height)).unwrap();
